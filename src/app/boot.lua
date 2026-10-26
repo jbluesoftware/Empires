@@ -1,5 +1,6 @@
 -- Application bootstrap: initialises modules in dependency order, builds the shared context,
--- registers scenes and opens the first one (menu, or host/client when passed as a launch argument).
+-- registers scenes and opens the first one (the menu, or a scene named by the first launch argument).
+-- Desktop testing: `love src play 1` and `love src play 2` open two side-by-side windows straight into Play.
 
 local config = require("app.config")
 local settings = require("app.settings")
@@ -15,22 +16,17 @@ local M = {}
 
 local SCENE_MODULE_NAMES_BY_SCENE_NAME = {
   menu = "app.scenes.menu",
-  host = "app.scenes.host",
-  client = "app.scenes.client",
+  play = "app.scenes.play",
+  settings = "app.scenes.settings",
 }
 
-local LAUNCH_SCENE_NAMES_BY_MODE = {
-  host = "host",
-  client = "client",
-}
+local DESKTOP_WINDOW_SLOT_SPACING_PIXELS = 420
 
-local DESKTOP_TEST_WINDOW_OFFSET_PIXELS = 230
-
--- Lets a host window and a client window sit side by side when both are launched on one desktop.
-local function arrange_desktop_test_window(launch_mode)
-  love.window.setTitle(string.format("%s (%s)", config.APP_NAME, launch_mode))
+-- Places numbered launch windows side by side: slot 1 left of the default position, slot 2 right of it.
+local function arrange_desktop_test_window(launch_scene_name, window_slot_number)
+  love.window.setTitle(string.format("%s (%s %d)", config.APP_NAME, launch_scene_name, window_slot_number))
   local window_x, window_y, display_index = love.window.getPosition()
-  local horizontal_offset = launch_mode == "client" and DESKTOP_TEST_WINDOW_OFFSET_PIXELS or -DESKTOP_TEST_WINDOW_OFFSET_PIXELS
+  local horizontal_offset = (window_slot_number - 1.5) * DESKTOP_WINDOW_SLOT_SPACING_PIXELS
   love.window.setPosition(window_x + horizontal_offset, window_y, display_index)
 end
 
@@ -41,7 +37,8 @@ function M.initialise(command_line_arguments)
   screen.init(config.VIRTUAL_WIDTH, config.VIRTUAL_HEIGHT)
   settings.load()
 
-  local launch_mode = command_line_arguments and command_line_arguments[1]
+  local launch_scene_name = command_line_arguments and command_line_arguments[1]
+  local window_slot_number = tonumber(command_line_arguments and command_line_arguments[2])
 
   local context = {
     config = config,
@@ -52,7 +49,6 @@ function M.initialise(command_line_arguments)
     theme = theme,
     fonts = fonts,
     settings = settings,
-    launch_mode = launch_mode,
     devtools = nil,
   }
 
@@ -70,11 +66,11 @@ function M.initialise(command_line_arguments)
     scene_manager.register(scene_name, require(module_name))
   end
 
-  local launch_scene_name = LAUNCH_SCENE_NAMES_BY_MODE[launch_mode]
-  if launch_scene_name and not config.IS_MOBILE then
-    arrange_desktop_test_window(launch_mode)
+  local has_valid_launch_scene = SCENE_MODULE_NAMES_BY_SCENE_NAME[launch_scene_name] ~= nil
+  if has_valid_launch_scene and window_slot_number and not config.IS_MOBILE then
+    arrange_desktop_test_window(launch_scene_name, window_slot_number)
   end
-  scene_manager.switch(launch_scene_name or "menu")
+  scene_manager.switch(has_valid_launch_scene and launch_scene_name or "menu")
 
   return context
 end

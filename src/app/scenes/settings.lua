@@ -1,4 +1,4 @@
--- Host scene (placeholder): will start the session server and announce it on the local network.
+-- Settings scene (placeholder): will hold user preferences backed by app/settings.lua.
 
 local Scene = require("core.scene")
 local Button = require("ui.widgets.button")
@@ -7,9 +7,9 @@ local theme = require("ui.theme")
 
 local TITLE_VERTICAL_POSITION = 160
 
-local HostScene = Scene.extend()
+local SettingsScene = Scene.extend()
 
-function HostScene:enter(context)
+function SettingsScene:enter(context)
   self.context = context
   self.virtual_width = context.screen.get_size()
 
@@ -24,24 +24,24 @@ function HostScene:enter(context)
   end)
 end
 
-function HostScene:draw()
+function SettingsScene:draw()
   love.graphics.setColor(theme.colors.text)
   love.graphics.setFont(fonts.get("title"))
-  love.graphics.printf("Host", 0, TITLE_VERTICAL_POSITION, self.virtual_width, "center")
+  love.graphics.printf("Settings", 0, TITLE_VERTICAL_POSITION, self.virtual_width, "center")
   self.back_button:draw()
 end
 
-function HostScene:pointerpressed(virtual_x, virtual_y)
+function SettingsScene:pointerpressed(virtual_x, virtual_y)
   self.back_button:pointerpressed(virtual_x, virtual_y)
 end
 
-function HostScene:pointerreleased(virtual_x, virtual_y)
+function SettingsScene:pointerreleased(virtual_x, virtual_y)
   self.back_button:pointerreleased(virtual_x, virtual_y)
 end
 
-function HostScene:back()
+function SettingsScene:back()
   self.context.scenes.switch("menu")
   return true
 end
 
-return HostScene
+return SettingsScene

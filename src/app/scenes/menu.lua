@@ -1,4 +1,4 @@
--- Main menu scene: lets the user choose between hosting a session and joining one.
+-- Main menu scene: Play (auto-connects to the local session) and Settings.
 
 local Scene = require("core.scene")
 local Button = require("ui.widgets.button")
@@ -19,14 +19,14 @@ function MenuScene:enter(context)
 
   self.buttons = {
     Button.new(
-      "Host a session",
+      "Play",
       { x = button_x, y = FIRST_BUTTON_VERTICAL_POSITION, width = button_width, height = theme.button_height },
       function()
-        context.scenes.switch("host")
+        context.scenes.switch("play")
       end
     ),
     Button.new(
-      "Join a session",
+      "Settings",
       {
         x = button_x,
         y = FIRST_BUTTON_VERTICAL_POSITION + theme.button_height + theme.spacing.medium,
@@ -34,7 +34,7 @@ function MenuScene:enter(context)
         height = theme.button_height,
       },
       function()
-        context.scenes.switch("client")
+        context.scenes.switch("settings")
       end
     ),
   }

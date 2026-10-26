@@ -21,19 +21,31 @@ function Transport.new(options)
     udp_socket = nil,
     bound_port = nil,
     local_ip = nil,
+    logged_send_errors = {},
     broadcast_addresses = { LIMITED_BROADCAST_ADDRESS, LOOPBACK_ADDRESS },
   }, Transport)
 end
 
+-- socket.udp() creates the OS socket lazily and may pick IPv6, which breaks IPv4 sends and the broadcast
+-- option; udp4() creates an IPv4 socket immediately (older LuaSocket builds fall back to udp()).
+local function create_ipv4_udp_socket()
+  return (socket.udp4 or socket.udp)()
+end
+
 function Transport:open()
   self:close()
+  self.logged_send_errors = {}
 
   for port_offset = 0, self.port_count - 1 do
     local candidate_port = self.base_port + port_offset
-    local udp_socket = socket.udp()
+    local udp_socket = create_ipv4_udp_socket()
     udp_socket:settimeout(0)
-    udp_socket:setoption("broadcast", true)
     if udp_socket:setsockname("*", candidate_port) then
+      -- Set after binding so the OS socket certainly exists.
+      local did_enable_broadcast, broadcast_error = udp_socket:setoption("broadcast", true)
+      if not did_enable_broadcast then
+        log.warn("could not enable broadcast: %s", tostring(broadcast_error))
+      end
       self.udp_socket = udp_socket
       self.bound_port = candidate_port
       self:refresh_local_ip()
@@ -73,7 +85,7 @@ end
 
 -- Returns the current LAN IPv4 address, or nil when there is no usable route (e.g. Wi-Fi off).
 function Transport:refresh_local_ip()
-  local probe_socket = socket.udp()
+  local probe_socket = create_ipv4_udp_socket()
   local local_ip
   if probe_socket:setpeername(ROUTE_PROBE_ADDRESS, ROUTE_PROBE_PORT) then
     local_ip = probe_socket:getsockname()
@@ -93,13 +105,18 @@ function Transport:refresh_local_ip()
   return local_ip
 end
 
-function Transport:send(destination_ip, destination_port, packet_text)
+-- is_best_effort suppresses error logging (used by the subnet sweep, where most addresses are empty).
+function Transport:send(destination_ip, destination_port, packet_text, is_best_effort)
   if not self.udp_socket then
     return false
   end
   local was_sent, error_message = self.udp_socket:sendto(packet_text, destination_ip, destination_port)
-  if not was_sent then
-    log.debug("send to %s:%s failed: %s", destination_ip, tostring(destination_port), tostring(error_message))
+  if not was_sent and not is_best_effort and error_message ~= "timeout" then -- "timeout" = send buffer momentarily full
+    -- Warn once per distinct error so a systematic failure is visible without flooding the log.
+    if not self.logged_send_errors[error_message] then
+      self.logged_send_errors[error_message] = true
+      log.warn("send to %s:%s failed: %s", destination_ip, tostring(destination_port), tostring(error_message))
+    end
   end
   return was_sent ~= nil
 end

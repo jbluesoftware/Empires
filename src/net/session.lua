@@ -28,6 +28,7 @@ local STATUS = {
 
 local MAXIMUM_PACKETS_PER_UPDATE = 64
 local MAXIMUM_SWEEP_ELAPSED_SECONDS = 0.25
+local MAXIMUM_SWEEP_SENDS_PER_UPDATE = 16
 local SUBNET_HOST_COUNT = 254
 local UNKNOWN_IP = "0.0.0.0"
 
@@ -423,6 +424,7 @@ function Session:resolve_succession_step()
 end
 
 function Session:adopt_snapshot(message, source_ip, source_port)
+  local was_connected = self.status == STATUS.CONNECTED
   self.status = STATUS.CONNECTED
   self.session_id = message.session_id
   self.epoch = message.epoch
@@ -432,7 +434,9 @@ function Session:adopt_snapshot(message, source_ip, source_port)
   self.host_ip = source_ip
   self.host_port = source_port
   self.last_host_heard = self:now()
-  self.next_heartbeat_at = self:now() + self.timing.HEARTBEAT_INTERVAL_SECONDS
+  if not was_connected then
+    self.next_heartbeat_at = self:now() + self.timing.HEARTBEAT_INTERVAL_SECONDS
+  end
   self.succession = nil
   self.remote_members_are_stale = true
 
@@ -497,12 +501,13 @@ function Session:advance_sweep(elapsed_seconds, addresses_per_second)
   end
 
   self.sweep_credit = self.sweep_credit + math.min(elapsed_seconds, MAXIMUM_SWEEP_ELAPSED_SECONDS) * addresses_per_second
+  self.sweep_credit = math.min(self.sweep_credit, MAXIMUM_SWEEP_SENDS_PER_UPDATE)
   while self.sweep_credit >= 1 do
     self.sweep_credit = self.sweep_credit - 1
     self.sweep_cursor = self.sweep_cursor % SUBNET_HOST_COUNT + 1
     local target_ip = subnet_prefix .. "." .. self.sweep_cursor
     if target_ip ~= local_ip then
-      self.transport:send(target_ip, self.transport:get_base_port(), self.hello_text)
+      self.transport:send(target_ip, self.transport:get_base_port(), self.hello_text, true)
     end
   end
 end

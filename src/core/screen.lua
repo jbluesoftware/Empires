@@ -36,6 +36,10 @@ function M.to_virtual(window_x, window_y)
   return (window_x - letterbox_offset_x) / scale_factor, (window_y - letterbox_offset_y) / scale_factor
 end
 
+function M.to_window(virtual_x, virtual_y)
+  return virtual_x * scale_factor + letterbox_offset_x, virtual_y * scale_factor + letterbox_offset_y
+end
+
 -- Returns left, top, right, bottom in virtual coordinates.
 function M.safe_area()
   local safe_x, safe_y, safe_width, safe_height = love.window.getSafeArea()
